@@ -1,0 +1,46 @@
+name: detector_ervas_daninhas
+description: Aplicativo para detecção de ervas daninhas com IA
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0-113.0.dev
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_launcher_icons: ^0.14.4
+  tflite_flutter: ^0.12.1
+  image: ^4.5.4
+  image_picker: ^1.0.7
+  http: ^1.1.0
+  geolocator: ^11.0.0
+  shared_preferences: ^2.2.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.5
+  latlong2: ^0.9.1
+  flutter_map: ^8.2.2
+  connectivity_plus: ^6.0.3
+  webview_flutter: ^4.13.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/logo.png
+    - assets/icons/models/weed_detector.tflite
+    - assets/icons/models/labels.txt
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/logo.png"
+  min_sdk_android: 21
