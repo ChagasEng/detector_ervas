@@ -1,20 +1,38 @@
 import 'dart:io';
+import 'package:detector_ervas_daninhas/pages/dashboard_page.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/history_item.dart';
 import 'map_page.dart';
-import 'chatbase_embed_page.dart'; // 👈 Importa o Chatbase
+import 'chatbase_embed_page.dart';
+import 'history_view_page.dart';
 
-class HistoryPage extends StatelessWidget {
+class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  static const int itemsPerPage = 8;
+  int currentPage = 0;
 
   @override
   Widget build(BuildContext context) {
     final box = Hive.box('history');
+
     final items = box.values
         .map((e) => HistoryItem.fromMap(Map<String, dynamic>.from(e)))
         .toList()
         .reversed
+        .toList();
+
+    final totalPages = (items.length / itemsPerPage).ceil();
+
+    final pageItems = items
+        .skip(currentPage * itemsPerPage)
+        .take(itemsPerPage)
         .toList();
 
     return Scaffold(
@@ -23,7 +41,18 @@ class HistoryPage extends StatelessWidget {
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
         actions: [
-          // 💬 Botão para abrir o Chatbase
+          // --- BOTÃO ALDO (NOVO) ---
+          IconButton(
+            icon: const Icon(Icons.analytics_outlined),
+            tooltip: 'Dashboard Agronômico (Aldo)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DashboardPage()),
+              );
+            },
+          ),
+
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
             tooltip: 'Assistente Chatbase',
@@ -34,8 +63,6 @@ class HistoryPage extends StatelessWidget {
               );
             },
           ),
-
-          // 🔹 Botão para abrir o mapa de calor
           IconButton(
             icon: const Icon(Icons.map_rounded),
             tooltip: 'Ver no mapa',
@@ -46,8 +73,6 @@ class HistoryPage extends StatelessWidget {
               );
             },
           ),
-
-          // 🔹 Botão para limpar histórico
           IconButton(
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Limpar histórico',
@@ -88,6 +113,7 @@ class HistoryPage extends StatelessWidget {
           ),
         ],
       ),
+
       body: items.isEmpty
           ? const Center(
               child: Text(
@@ -95,52 +121,95 @@ class HistoryPage extends StatelessWidget {
                 style: TextStyle(fontSize: 16, color: Colors.black54),
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(item.imagePath),
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.image_not_supported),
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: pageItems.length,
+                    itemBuilder: (context, i) {
+                      final item = pageItems[i];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                      ),
-                    ),
-                    title: Text(
-                      item.label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Confiança: ${item.confidence}%\n'
-                      'Data: ${item.date.day}/${item.date.month}/${item.date.year} '
-                      '${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}\n'
-                      '${item.latitude != null ? 'Lat: ${item.latitude!.toStringAsFixed(5)}, Lng: ${item.longitude!.toStringAsFixed(5)}' : ''}',
-                    ),
-                    trailing: const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                      color: Colors.grey,
+                        child: ListTile(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => HistoryViewPage(item: item),
+                              ),
+                            );
+                          },
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(item.imagePath),
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Icon(Icons.image_not_supported),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            item.label,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Confiança: ${item.confidence}%\n'
+                            'Data: ${item.date.day}/${item.date.month}/${item.date.year} '
+                            '${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}\n'
+                            '${item.latitude != null ? 'Lat: ${item.latitude!.toStringAsFixed(5)}, Lng: ${item.longitude!.toStringAsFixed(5)}' : ''}',
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                // PAGINAÇÃO
+                if (totalPages > 1)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton(
+                          onPressed: currentPage > 0
+                              ? () => setState(() => currentPage--)
+                              : null,
+                          child: const Text("Anterior"),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "Página ${currentPage + 1} de $totalPages",
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton(
+                          onPressed: currentPage < totalPages - 1
+                              ? () => setState(() => currentPage++)
+                              : null,
+                          child: const Text("Próxima"),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
+              ],
             ),
     );
   }

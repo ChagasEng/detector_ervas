@@ -11,21 +11,39 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   cupertino_icons: ^1.0.8
-  flutter_launcher_icons: ^0.14.4
+
+  # IA / TFLite
   tflite_flutter: ^0.12.1
   image: ^4.5.4
+
+
+
+  # Câmera / Arquivos
   image_picker: ^1.0.7
-  http: ^1.1.0
-  geolocator: ^11.0.0
+  path_provider: ^2.1.5
+
+  # Localização
+  geolocator: ^14.0.2
+
+  # Armazenamento
   shared_preferences: ^2.2.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  path_provider: ^2.1.5
+
+  # Mapas / Geo
   latlong2: ^0.9.1
   flutter_map: ^8.2.2
-  connectivity_plus: ^6.0.3
+
+  # Internet / APIS
+  http: ^1.1.0
+  connectivity_plus: ^7.0.0
+
+  # Gráficos / UI
+  fl_chart: ^0.64.0
   webview_flutter: ^4.13.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -37,6 +55,8 @@ flutter:
   assets:
     - assets/icons/logo.png
     - assets/icons/models/weed_detector.tflite
+    - assets/icons/models/weed_detector_compat.tflite
+
     - assets/icons/models/labels.txt
 
 flutter_launcher_icons:

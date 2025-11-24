@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 
 class WeatherService {
-  /// Busca a previsão do tempo e o nome da cidade
   Future<Map<String, dynamic>?> getWeather() async {
     try {
       print('🌍 Iniciando busca de clima...');
@@ -27,77 +26,97 @@ class WeatherService {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
       );
-      print('📍 Localização: ${position.latitude}, ${position.longitude}');
 
       final lat = position.latitude;
       final lon = position.longitude;
 
-      // Consulta clima
+      print("📍 Posição: $lat, $lon");
+
       final weatherUrl = Uri.parse(
         'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true',
       );
+
       final weatherResp = await http.get(weatherUrl);
-      print('🌦️ Clima: ${weatherResp.statusCode}');
+      print("🌦️ Status clima: ${weatherResp.statusCode}");
 
       if (weatherResp.statusCode != 200) {
         return _loadCachedWeather();
       }
 
-      final weatherData = jsonDecode(weatherResp.body);
-      final weather = weatherData['current_weather'];
+      final weatherJson = jsonDecode(weatherResp.body);
+      final weather = weatherJson["current_weather"];
+
       if (weather == null) {
-        print('⚠️ API retornou sem campo current_weather.');
+        print("⚠️ Clima retornou nulo");
         return _loadCachedWeather();
       }
 
-      // Consulta cidade
       final geoUrl = Uri.parse(
-        'https://geocode.maps.co/reverse?lat=$lat&lon=$lon',
+        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=$lat&lon=$lon&zoom=18&addressdetails=1',
       );
-      final geoResp = await http.get(geoUrl);
-      print('📡 Geolocalização: ${geoResp.statusCode}');
+
+      final geoResp = await http.get(
+        geoUrl,
+        headers: {
+          'User-Agent': 'PlantScanApp/1.0 (matheus@app.com)',
+        },
+      );
+
+      print("📡 Status geocodificação: ${geoResp.statusCode}");
 
       String? cidade;
+      String? estado;
+
       if (geoResp.statusCode == 200) {
         final geoData = jsonDecode(geoResp.body);
+        final addr = geoData["address"] ?? {};
+
         cidade =
-            geoData['address']?['city'] ??
-            geoData['address']?['town'] ??
-            geoData['address']?['village'] ??
-            geoData['address']?['state'];
+            addr["city"] ??
+            addr["town"] ??
+            addr["village"] ??
+            addr["municipality"] ??
+            addr["county"];
+
+        estado = addr["state"];
       }
+
+      cidade ??= "Cidade não localizada";
+      estado ??= "Estado não identificado";
 
       final prefs = await SharedPreferences.getInstance();
       final cachedData = {
-        'time': DateTime.now().toIso8601String(),
-        'temperature': weather['temperature'] ?? 0.0,
-        'windspeed': weather['windspeed'] ?? 0.0,
-        'weathercode': weather['weathercode'] ?? 0,
-        'city': cidade ?? 'Local desconhecido',
+        "time": DateTime.now().toIso8601String(),
+        "temperature": weather["temperature"] ?? 0.0,
+        "windspeed": weather["windspeed"] ?? 0.0,
+        "weathercode": weather["weathercode"] ?? 0,
+        "city": cidade,
+        "state": estado,
       };
 
-      await prefs.setString('weather_cache', jsonEncode(cachedData));
-      print('✅ Clima salvo e retornado: $cachedData');
+      await prefs.setString("weather_cache", jsonEncode(cachedData));
+      print("✅ Salvo no cache: $cachedData");
+
       return cachedData;
     } catch (e) {
-      print('⚠️ Erro inesperado: $e');
+      print("❌ Erro inesperado: $e");
       return _loadCachedWeather();
     }
   }
 
-  /// 🔄 Carrega cache local caso não haja conexão
   Future<Map<String, dynamic>?> _loadCachedWeather() async {
     final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('weather_cache');
-    if (cached != null) {
-      print('🌤️ Dados de clima carregados do cache.');
-      return jsonDecode(cached);
+    final data = prefs.getString("weather_cache");
+
+    if (data != null) {
+      print("🌤️ Recuperado do cache!");
+      return jsonDecode(data);
     }
-    print('⚠️ Nenhum cache de clima encontrado.');
+
+    print("⚠️ Cache vazio.");
     return null;
   }
 
-  /// 🌦️ Converte o código da condição (Open-Meteo) em texto + emoji
   String describeWeather(int code) {
     switch (code) {
       case 0:
@@ -115,7 +134,7 @@ class WeatherService {
       case 61:
       case 63:
       case 65:
-        return "🌧️ Chuva leve";
+        return "🌧️ Chuva";
       case 71:
       case 73:
       case 75:

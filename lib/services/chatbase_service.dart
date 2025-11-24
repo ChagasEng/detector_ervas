@@ -5,11 +5,10 @@ import '../models/chat_message.dart';
 import 'connectivity_service.dart';
 
 class ChatbaseService {
-  static const _chatbotId = "RmehOVMlMrwNwTufX7KlKo"; // ✅ Seu Chatbot ID
-  static const _apiKey = "bf944de1-3404-4b35-8ef8-088b428f5991"; // ✅ Sua API Key
-  static const _apiUrl = "https://www.chatbase.co/api/v4/chat"; // ✅ API v4 atual
+  static const _chatbotId = "RmehOVMlMrwNwTufX7KlKo"; 
+  static const _apiKey = "bf944de1-3404-4b35-8ef8-088b428f5991";
+  static const _apiUrl = "https://www.chatbase.co/api/v4/chat"; 
 
-  /// 🔹 Envia mensagem ao Chatbase (com suporte offline)
   static Future<String> sendMessage(String message) async {
     print("🔵 [CHATBASE] Iniciando sendMessage...");
     print("🔵 [CHATBASE] Mensagem recebida: '$message'");
@@ -73,7 +72,6 @@ class ChatbaseService {
     }
   }
 
-  /// 🔹 Verifica credenciais iniciais (setup do bot)
   static Future<void> verifySetup() async {
     print("🔐 [SETUP] Verificando configuração do Chatbase...");
     print("🔐 [SETUP] Chatbot ID: $_chatbotId");
@@ -111,7 +109,6 @@ class ChatbaseService {
     }
   }
 
-  /// 🔹 Reenvia mensagens pendentes ao reconectar
   static Future<void> resendPending() async {
     print("🟡 [CHATBASE] Iniciando resendPending...");
 

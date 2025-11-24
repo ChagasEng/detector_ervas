@@ -13,13 +13,12 @@ class WeatherNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Se não há previsão real, usamos dados fake de Ponta Grossa 🌾
     final fakeWeather = {
       'city': 'Ponta Grossa',
       'temperature': 22.0,
       'humidity': 78,
       'windspeed': 10,
-      'weathercode': 2, // parcialmente nublado
+      'weathercode': 2,
     };
 
     final w = weather ?? fakeWeather;
@@ -45,7 +44,6 @@ class WeatherNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 📍 Local + condição
           Row(
             children: [
               const Icon(Icons.location_on, color: Colors.white, size: 22),
@@ -75,7 +73,6 @@ class WeatherNavBar extends StatelessWidget {
             ],
           ),
 
-          // 🌤️ Indicadores agrícolas (vento + umidade)
           Row(
             children: [
               Column(

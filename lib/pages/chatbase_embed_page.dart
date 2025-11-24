@@ -22,7 +22,6 @@ class _ChatbaseEmbedPageState extends State<ChatbaseEmbedPage> {
   void initState() {
     super.initState();
 
-    // ✅ Corrige inicialização por plataforma
     if (Platform.isAndroid) {
       WebViewPlatform.instance = AndroidWebViewPlatform();
     } else if (Platform.isIOS) {

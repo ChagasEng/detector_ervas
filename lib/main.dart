@@ -2,37 +2,31 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+
 import 'ml/weed_detector.dart';
 import 'services/weather_service.dart';
 import 'widgets/weather_navbar.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 import 'models/history_item.dart';
 import 'pages/history_page.dart';
-import 'pages/chat_page.dart'; // 💬 tela de chat IA
-import 'services/connectivity_service.dart'; // 🌐 checa conexão
-import 'services/chatbase_service.dart'; // 🤖 integração com Chatbase
+import 'services/connectivity_service.dart';
+import 'services/chatbase_service.dart';
 
-// =====================================================
-// APP PRINCIPAL
-// =====================================================
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 📦 Inicializa Hive
   final dir = await getApplicationDocumentsDirectory();
   await Hive.initFlutter(dir.path);
-  await Hive.openBox('history');     // histórico de análises
-  await Hive.openBox('chat_queue');  // fila de mensagens offline
 
-  // 🌐 Verifica conexão inicial
-  await ConnectivityService.hasConnection();
+  await Hive.openBox('history');
+  await Hive.openBox('chat_queue');
 
-  // 🤖 Valida configuração da IA Chatbase
-  await ChatbaseService.verifySetup();
-
-  // 📡 Reenvia mensagens pendentes se houver
-  await ChatbaseService.resendPending();
+  final conectado = await ConnectivityService.hasConnection();
+  if (conectado) {
+    ChatbaseService.verifySetup();
+    ChatbaseService.resendPending();
+  }
 
   runApp(const WeedApp());
 }
@@ -46,23 +40,15 @@ class WeedApp extends StatelessWidget {
       title: 'PlantScan 🌿',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.green,
-        scaffoldBackgroundColor: const Color(0xFFF7F7FF),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0.5,
-          centerTitle: true,
-        ),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green.shade600),
+        scaffoldBackgroundColor: const Color(0xFFF3F5F2),
       ),
       home: const WeedHomePage(),
     );
   }
 }
 
-// =====================================================
-// TELA PRINCIPAL (Detecção de Ervas Daninhas)
-// =====================================================
 class WeedHomePage extends StatefulWidget {
   const WeedHomePage({super.key});
 
@@ -77,8 +63,10 @@ class _WeedHomePageState extends State<WeedHomePage> {
   File? _image;
   String? _label;
   String? _confidence;
+
   bool _carregandoModelo = true;
   bool _analisando = false;
+
   Map<String, dynamic>? _weather;
 
   @override
@@ -98,54 +86,47 @@ class _WeedHomePageState extends State<WeedHomePage> {
     setState(() => _weather = w);
   }
 
-  /// 🧭 Obter localização atual
   Future<Position?> _getLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        await Geolocator.openLocationSettings();
-        return null;
-      }
+      if (!serviceEnabled) return null;
 
       LocationPermission permission = await Geolocator.checkPermission();
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) return null;
       }
-
       if (permission == LocationPermission.deniedForever) return null;
 
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-    } catch (e) {
-      debugPrint('Erro ao obter localização: $e');
+    } catch (_) {
       return null;
     }
   }
 
-  /// 📸 Escolher imagem (câmera ou galeria)
   Future<void> _selecionarImagem({required ImageSource origem}) async {
     final picker = ImagePicker();
+
     final foto = await picker.pickImage(
       source: origem,
-      imageQuality: 60,
-      maxWidth: 1024,
+      imageQuality: 65,
+      maxWidth: 1200,
     );
 
     if (foto == null) return;
 
+    final file = File(foto.path);
     setState(() {
-      _image = File(foto.path);
+      _image = file;
       _label = null;
       _confidence = null;
       _analisando = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 200));
     final resultado = await _detector.predict(_image!);
-    await Future.delayed(const Duration(milliseconds: 500));
-
     final posicao = await _getLocation();
 
     setState(() {
@@ -154,31 +135,40 @@ class _WeedHomePageState extends State<WeedHomePage> {
       _analisando = false;
     });
 
-    // 💾 salva no histórico Hive
     final box = Hive.box('history');
-    final item = HistoryItem(
-      imagePath: _image!.path,
-      label: _label ?? 'Desconhecido',
-      confidence: _confidence ?? '0',
-      date: DateTime.now(),
-      latitude: posicao?.latitude,
-      longitude: posicao?.longitude,
+
+    await box.add(
+      HistoryItem(
+        imagePath: _image!.path,
+        label: _label ?? 'Desconhecido',
+        confidence: _confidence ?? '0',
+        date: DateTime.now(),
+        latitude: posicao?.latitude,
+        longitude: posicao?.longitude,
+      ).toMap(),
     );
-    await box.add(item.toMap());
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool isVegetacaoComum = _label == 'Vegetação comum';
+    final isOk = _label == 'Vegetação comum';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PlantScan 🌿', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text(
+          'PlantScan 🌿',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+            letterSpacing: 0.2,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 1,
         actions: [
-          // 🕓 Histórico
           IconButton(
-            icon: const Icon(Icons.history_rounded, color: Colors.green),
+            icon: const Icon(Icons.history_rounded, size: 28),
             onPressed: () {
               Navigator.push(
                 context,
@@ -193,180 +183,272 @@ class _WeedHomePageState extends State<WeedHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    'Carregando modelo de IA...\nAguarde um instante.',
-                    textAlign: TextAlign.center,
-                  ),
+                  CircularProgressIndicator(strokeWidth: 3),
+                  SizedBox(height: 20),
+                  Text("Carregando modelo...", style: TextStyle(fontSize: 16)),
                 ],
               ),
             )
           : Column(
               children: [
-                // 🌦️ Clima no topo
                 WeatherNavBar(weather: _weather, service: _weatherService),
-
-                // Conteúdo principal
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        // CARD IMAGEM
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 15,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(18),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  child: _image != null
-                                      ? Image.file(
-                                          _image!,
-                                          key: ValueKey(_image?.path),
-                                          height: 260,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Container(
-                                          key: const ValueKey('placeholder'),
-                                          height: 260,
-                                          width: double.infinity,
-                                          color: const Color(0xFFE8F5E9),
-                                          child: Icon(
-                                            Icons.nature,
-                                            size: 80,
-                                            color: Colors.green.shade700,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              if (_analisando) ...[
-                                const LinearProgressIndicator(),
-                                const SizedBox(height: 12),
-                                Text(
-                                  '🔎 Analisando imagem...',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[800],
-                                  ),
-                                ),
-                              ] else if (_label != null && _confidence != null) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      isVegetacaoComum
-                                          ? Icons.check_circle_outline
-                                          : Icons.warning_amber_rounded,
-                                      color: isVegetacaoComum
-                                          ? Colors.green
-                                          : Colors.redAccent,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Resultado:',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '$_label (${_confidence}%)',
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: isVegetacaoComum
-                                        ? Colors.green.shade700
-                                        : Colors.redAccent,
-                                  ),
-                                ),
-                              ] else ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tire ou selecione uma foto da planta para iniciar a análise.',
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        // BOTÕES
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _analisando
-                                    ? null
-                                    : () => _selecionarImagem(origem: ImageSource.camera),
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('Câmera'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _analisando
-                                    ? null
-                                    : () => _selecionarImagem(origem: ImageSource.gallery),
-                                icon: const Icon(Icons.photo_library_outlined),
-                                label: const Text('Galeria'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade400,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildBody(theme, isOk),
               ],
             ),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme, bool isOk) {
+    return Expanded(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          children: [
+            _buildImageCard(theme, isOk),
+            const SizedBox(height: 35),
+            _buildButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageCard(ThemeData theme, bool isOk) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _image != null
+                  ? Image.file(
+                      _image!,
+                      height: 260,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      height: 260,
+                      width: double.infinity,
+                      color: const Color(0xFFE9F3E8),
+                      child: Icon(
+                        Icons.eco_rounded,
+                        size: 90,
+                        color: Colors.green.shade600,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_analisando) _buildLoadingState(theme),
+          if (!_analisando && _label != null) _buildResult(theme, isOk),
+          if (!_analisando && _label == null)
+            Text(
+              "Capture ou selecione uma imagem para começar.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(ThemeData theme) {
+    return Column(
+      children: [
+        const LinearProgressIndicator(),
+        const SizedBox(height: 16),
+        Text(
+          "Analisando imagem…",
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResult(ThemeData theme, bool isOk) {
+    return Column(
+      children: [
+        Icon(
+          isOk ? Icons.check_circle_rounded : Icons.warning_rounded,
+          size: 58,
+          color: isOk ? Colors.green : Colors.redAccent,
+        ),
+        const SizedBox(height: 14),
+        Text(
+          _label ?? "",
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isOk ? Colors.green.shade700 : Colors.redAccent,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Confiança: ${_confidence ?? '0'}%",
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 22),
+        _buildAgronomicCard(isOk),
+        const SizedBox(height: 24),
+        _buildClearButton(),
+      ],
+    );
+  }
+
+  Widget _buildAgronomicCard(bool isOk) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isOk ? Colors.green.shade200 : Colors.red.shade200,
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isOk ? "Vegetação Comum" : "Possível Planta Daninha",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isOk ? Colors.green.shade600 : Colors.red.shade600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (!isOk) ...[
+            const Text(
+              "Recomendação Agronômica:",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "• Verifique a área ao redor.\n"
+              "• Avalie a densidade da infestação.\n"
+              "• Monitore nos próximos dias.\n"
+              "• Se aumentar, adote manejo mecânico ou químico.",
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.4,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ],
+          if (isOk)
+            Text(
+              "Esta planta não parece representar risco agronômico.",
+              style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClearButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: () {
+          setState(() {
+            _image = null;
+            _label = null;
+            _confidence = null;
+          });
+        },
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text(
+          "Limpar análise",
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          backgroundColor: Colors.green.shade600,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _analisando
+                ? null
+                : () => _selecionarImagem(origem: ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_rounded, size: 24),
+            label: const Text("Usar Câmera"),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              textStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _analisando
+                ? null
+                : () => _selecionarImagem(origem: ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_rounded, size: 24),
+            label: const Text("Escolher da Galeria"),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              foregroundColor: Colors.green.shade700,
+              side: BorderSide(color: Colors.green.shade600, width: 1.6),
+              textStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -8,7 +8,10 @@ class WeedDetector {
   late Interpreter _interpreter;
   late List<String> _labels;
 
-  /// Dicionário de tradução dos nomes das classes (Inglês → Português)
+  WeedDetector() {
+    loadModel();
+  }
+
   final Map<String, String> _traducao = {
     "Chinee apple": "Maçã Chinesa",
     "Lantana": "Lantana",
@@ -21,22 +24,20 @@ class WeedDetector {
     "Negatives": "Vegetação comum",
   };
 
-  /// Inicializa o modelo e carrega os labels
   Future<void> loadModel() async {
     try {
       _interpreter = await Interpreter.fromAsset(
-        'assets/icons/models/weed_detector.tflite',
+        'assets/icons/models/weed_detector_compat.tflite',
       );
-      print('✅ Modelo carregado com sucesso');
+      print('✅ Modelo carregado com sucesso!');
 
       _labels = await _loadLabels();
-      print('✅ Labels carregados: $_labels');
+      print('✅ Labels carregados (${_labels.length}): $_labels');
     } catch (e) {
-      print('❌ Erro ao carregar modelo: $e');
+      print('❌ Erro ao carregar modelo/labels: $e');
     }
   }
 
-  /// Carrega o arquivo labels.txt com os nomes das classes
   Future<List<String>> _loadLabels() async {
     try {
       final raw = await rootBundle.loadString('assets/icons/models/labels.txt');
@@ -46,16 +47,20 @@ class WeedDetector {
           .where((e) => e.isNotEmpty)
           .toList();
     } catch (e) {
-      print('⚠️ Nenhum arquivo labels.txt encontrado.');
+      print('⚠️ labels.txt não encontrado.');
       return [];
     }
   }
 
-  /// Pré-processa a imagem (redimensiona e normaliza)
   Uint8List _preprocess(File imageFile) {
     final imageBytes = imageFile.readAsBytesSync();
     img.Image? image = img.decodeImage(imageBytes);
-    img.Image resized = img.copyResize(image!, width: 224, height: 224);
+
+    if (image == null) {
+      throw Exception("Erro ao decodificar imagem");
+    }
+
+    img.Image resized = img.copyResize(image, width: 224, height: 224);
 
     Float32List input = Float32List(224 * 224 * 3);
     int pixelIndex = 0;
@@ -63,48 +68,47 @@ class WeedDetector {
     for (int y = 0; y < 224; y++) {
       for (int x = 0; x < 224; x++) {
         final pixel = resized.getPixel(x, y);
-        final int red = pixel.r.toInt();
-        final int green = pixel.g.toInt();
-        final int blue = pixel.b.toInt();
-        input[pixelIndex++] = red.toDouble() / 255.0;
-        input[pixelIndex++] = green.toDouble() / 255.0;
-        input[pixelIndex++] = blue.toDouble() / 255.0;
+        input[pixelIndex++] = pixel.r / 255.0;
+        input[pixelIndex++] = pixel.g / 255.0;
+        input[pixelIndex++] = pixel.b / 255.0;
       }
     }
 
     return input.buffer.asUint8List();
   }
 
-  /// Executa a predição e retorna o nome traduzido
   Future<Map<String, dynamic>> predict(File imageFile) async {
     try {
+      if (_labels.isEmpty) {
+        throw Exception("Labels não carregados");
+      }
+
       var input = _preprocess(imageFile);
-      var output = List.filled(_labels.length, 0.0).reshape([1, _labels.length]);
+      var output = List.filled(
+        _labels.length,
+        0.0,
+      ).reshape([1, _labels.length]);
 
       _interpreter.run(input, output);
 
-      // Encontra o índice da maior probabilidade
       int maxIndex = 0;
-      double maxValue = 0.0;
-      for (int i = 0; i < _labels.length; i++) {
+      double maxValue = output[0][0];
+      for (int i = 1; i < _labels.length; i++) {
         if (output[0][i] > maxValue) {
           maxValue = output[0][i];
           maxIndex = i;
         }
       }
 
-      // Nome original da classe
-      String labelOriginal =
-          _labels.isNotEmpty ? _labels[maxIndex] : 'Classe ${maxIndex + 1}';
-
-      // Tradução (caso exista no mapa)
-      String labelTraduzido = _traducao[labelOriginal] ?? labelOriginal;
+      String original = _labels[maxIndex];
+      String traduzido = _traducao[original] ?? original;
 
       print(
-          '🌿 Predição: $labelTraduzido (${(maxValue * 100).toStringAsFixed(2)}%)');
+        '🌿 Predição: $traduzido (${(maxValue * 100).toStringAsFixed(2)}%)',
+      );
 
       return {
-        'label': labelTraduzido,
+        'label': traduzido,
         'confidence': (maxValue * 100).toStringAsFixed(2),
       };
     } catch (e) {
