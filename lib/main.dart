@@ -126,17 +126,20 @@ class _WeedHomePageState extends State<WeedHomePage> {
       _analisando = true;
     });
 
+    // Processa a imagem primeiro (mais rápido)
     final resultado = await _detector.predict(_image!);
-    final posicao = await _getLocation();
-
+    
+    // Enquanto mostra resultado, busca localização em background
     setState(() {
       _label = resultado['label'] as String?;
       _confidence = resultado['confidence'] as String?;
       _analisando = false;
     });
 
-    final box = Hive.box('history');
+    // Busca localização e salva em background (não bloqueia a UI)
+    final posicao = await _getLocation();
 
+    final box = Hive.box('history');
     await box.add(
       HistoryItem(
         imagePath: _image!.path,
@@ -161,7 +164,6 @@ class _WeedHomePageState extends State<WeedHomePage> {
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 22,
-            letterSpacing: 0.2,
           ),
         ),
         backgroundColor: Colors.white,
@@ -192,24 +194,20 @@ class _WeedHomePageState extends State<WeedHomePage> {
           : Column(
               children: [
                 WeatherNavBar(weather: _weather, service: _weatherService),
-                _buildBody(theme, isOk),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                    child: Column(
+                      children: [
+                        _buildImageCard(theme, isOk),
+                        const SizedBox(height: 35),
+                        _buildButtons(),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-    );
-  }
-
-  Widget _buildBody(ThemeData theme, bool isOk) {
-    return Expanded(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        child: Column(
-          children: [
-            _buildImageCard(theme, isOk),
-            const SizedBox(height: 35),
-            _buildButtons(),
-          ],
-        ),
-      ),
     );
   }
 
@@ -231,26 +229,23 @@ class _WeedHomePageState extends State<WeedHomePage> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _image != null
-                  ? Image.file(
-                      _image!,
-                      height: 260,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      height: 260,
-                      width: double.infinity,
-                      color: const Color(0xFFE9F3E8),
-                      child: Icon(
-                        Icons.eco_rounded,
-                        size: 90,
-                        color: Colors.green.shade600,
-                      ),
+            child: _image != null
+                ? Image.file(
+                    _image!,
+                    height: 260,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    height: 260,
+                    width: double.infinity,
+                    color: const Color(0xFFE9F3E8),
+                    child: Icon(
+                      Icons.eco_rounded,
+                      size: 90,
+                      color: Colors.green.shade600,
                     ),
-            ),
+                  ),
           ),
           const SizedBox(height: 20),
           if (_analisando) _buildLoadingState(theme),

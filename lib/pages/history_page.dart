@@ -18,6 +18,337 @@ class _HistoryPageState extends State<HistoryPage> {
   static const int itemsPerPage = 8;
   int currentPage = 0;
 
+  Color getConfidenceColor(double value) {
+    if (value >= 85) return const Color(0xFF10B981); // Verde mais suave
+    if (value >= 60) return const Color(0xFFF59E0B); // Laranja mais suave
+    return const Color(0xFFEF4444); // Vermelho mais suave
+  }
+
+  String getConfidenceLabel(double value) {
+    if (value >= 85) return 'Alta Confiança';
+    if (value >= 60) return 'Média Confiança';
+    return 'Baixa Confiança';
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.analytics_outlined,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Nenhuma análise realizada',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'As análises realizadas aparecerão aqui',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfidenceBadge(double confidence) {
+    final color = getConfidenceColor(confidence);
+    final label = getConfidenceLabel(confidence);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${confidence.toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(HistoryItem item) {
+    final confidenceValue = double.tryParse(item.confidence.toString()) ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HistoryViewPage(item: item),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Thumbnail da imagem
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.file(
+                    File(item.imagePath),
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.photo_library_rounded,
+                        size: 30,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                
+                // Conteúdo do card
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Título e badge de confiança
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.label,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: Color(0xFF1F2937),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildConfidenceBadge(confidenceValue),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Data e hora
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${item.date.day.toString().padLeft(2, '0')}/${item.date.month.toString().padLeft(2, '0')}/${item.date.year}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${item.date.hour.toString().padLeft(2, '0')}:${item.date.minute.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      
+                      // Localização
+                      if (item.latitude != null)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_rounded,
+                              size: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${item.latitude!.toStringAsFixed(5)}, ${item.longitude!.toStringAsFixed(5)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                
+                // Ícone de seta
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: Colors.grey.shade400,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int totalPages) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Botão Anterior
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: currentPage > 0
+                  ? () => setState(() => currentPage--)
+                  : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF059669),
+                side: BorderSide(color: Colors.grey.shade300),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.arrow_back_ios_rounded, size: 16),
+              label: const Text('Anterior'),
+            ),
+          ),
+          const SizedBox(width: 16),
+          
+          // Indicador de página
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF059669).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${currentPage + 1} / $totalPages',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF059669),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          
+          // Botão Próxima
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: currentPage < totalPages - 1
+                  ? () => setState(() => currentPage++)
+                  : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF059669),
+                side: BorderSide(color: Colors.grey.shade300),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              label: const Text('Próxima'),
+              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final box = Hive.box('history');
@@ -29,7 +360,6 @@ class _HistoryPageState extends State<HistoryPage> {
         .toList();
 
     final totalPages = (items.length / itemsPerPage).ceil();
-
     final pageItems = items
         .skip(currentPage * itemsPerPage)
         .take(itemsPerPage)
@@ -37,14 +367,21 @@ class _HistoryPageState extends State<HistoryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico de Análises 🌿'),
-        backgroundColor: Colors.green.shade700,
+        title: const Text(
+          'Histórico de Análises',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        backgroundColor: const Color(0xFF059669),
         foregroundColor: Colors.white,
+        elevation: 0,
+        shadowColor: Colors.black.withOpacity(0.1),
         actions: [
-          // --- BOTÃO ALDO (NOVO) ---
           IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Dashboard Agronômico (Aldo)',
+            icon: const Icon(Icons.analytics_outlined, size: 22),
+            tooltip: 'Dashboard Agronômico',
             onPressed: () {
               Navigator.push(
                 context,
@@ -52,9 +389,8 @@ class _HistoryPageState extends State<HistoryPage> {
               );
             },
           ),
-
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: const Icon(Icons.chat_bubble_outline, size: 22),
             tooltip: 'Assistente Chatbase',
             onPressed: () {
               Navigator.push(
@@ -64,8 +400,8 @@ class _HistoryPageState extends State<HistoryPage> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.map_rounded),
-            tooltip: 'Ver no mapa',
+            icon: const Icon(Icons.map_rounded, size: 22),
+            tooltip: 'Mapa',
             onPressed: () {
               Navigator.push(
                 context,
@@ -74,27 +410,40 @@ class _HistoryPageState extends State<HistoryPage> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete_forever),
+            icon: const Icon(Icons.delete_sweep_rounded, size: 22),
             tooltip: 'Limpar histórico',
             onPressed: () async {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Apagar histórico?'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  title: const Text(
+                    'Apagar histórico?',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   content: const Text(
-                    'Essa ação removerá todas as análises salvas.',
+                    'Essa ação removerá todas as análises salvas definitivamente.',
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade600,
+                      ),
                       child: const Text('Cancelar'),
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Apagar'),
+                      child: const Text('Apagar Tudo'),
                     ),
                   ],
                 ),
@@ -102,115 +451,76 @@ class _HistoryPageState extends State<HistoryPage> {
 
               if (confirm == true) {
                 await box.clear();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Histórico apagado com sucesso.'),
-                  ),
-                );
-                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Histórico apagado com sucesso.'),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: const Color(0xFF059669),
+                    ),
+                  );
+                }
+                setState(() {});
               }
             },
           ),
         ],
       ),
 
-      body: items.isEmpty
-          ? const Center(
-              child: Text(
-                'Nenhuma análise registrada ainda.',
-                style: TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: pageItems.length,
-                    itemBuilder: (context, i) {
-                      final item = pageItems[i];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        elevation: 3,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: ListTile(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => HistoryViewPage(item: item),
-                              ),
-                            );
-                          },
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(item.imagePath),
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey.shade200,
-                                child: const Icon(Icons.image_not_supported),
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            item.label,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Confiança: ${item.confidence}%\n'
-                            'Data: ${item.date.day}/${item.date.month}/${item.date.year} '
-                            '${item.date.hour}:${item.date.minute.toString().padLeft(2, '0')}\n'
-                            '${item.latitude != null ? 'Lat: ${item.latitude!.toStringAsFixed(5)}, Lng: ${item.longitude!.toStringAsFixed(5)}' : ''}',
-                          ),
-                          trailing: const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+      body: Column(
+        children: [
+          // Header com estatísticas
+          if (items.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withOpacity(0.05),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
                 ),
-
-                // PAGINAÇÃO
-                if (totalPages > 1)
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        OutlinedButton(
-                          onPressed: currentPage > 0
-                              ? () => setState(() => currentPage--)
-                              : null,
-                          child: const Text("Anterior"),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          "Página ${currentPage + 1} de $totalPages",
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 12),
-                        OutlinedButton(
-                          onPressed: currentPage < totalPages - 1
-                              ? () => setState(() => currentPage++)
-                              : null,
-                          child: const Text("Próxima"),
-                        ),
-                      ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${items.length} análise${items.length != 1 ? 's' : ''} realizada${items.length != 1 ? 's' : ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF374151),
+                      fontSize: 14,
                     ),
                   ),
-              ],
+                  Text(
+                    'Página ${currentPage + 1} de $totalPages',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ),
+
+          // Lista ou estado vazio
+          Expanded(
+            child: items.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: pageItems.length,
+                    itemBuilder: (context, i) => _buildHistoryCard(pageItems[i]),
+                  ),
+          ),
+
+          // Paginação
+          if (totalPages > 1) _buildPaginationControls(totalPages),
+        ],
+      ),
     );
   }
 }
