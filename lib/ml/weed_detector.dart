@@ -104,7 +104,7 @@ class WeedDetector {
       String traduzido = _traducao[original] ?? original;
 
       print(
-        '🌿 Predição: $traduzido (${(maxValue * 100).toStringAsFixed(2)}%)',
+        ' Predição: $traduzido (${(maxValue * 100).toStringAsFixed(2)}%)',
       );
 
       return {
